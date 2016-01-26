@@ -1,9 +1,15 @@
 # dcom-make-version
 
 ## 1 - Installation
+In order to make it work you will need
+- node
+- npm
+
 ```
 npm install -g dcom-version
 ```
+
+## IMPORTANT, you need to have an SSH key configured on the repository you are trying to release, otherwise it won't work
 
 ## 2 - Usage
 Call ```dcom-version``` from your repository folder
