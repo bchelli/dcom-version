@@ -251,14 +251,19 @@ function mergeBranches (options) {
 				console.log(content);
 				return promptUserFor({
 					valid: {
-						pattern: /^(yes|no)$/,
-						description: 'Please resolve the merge conflict. When you are done please type\n\t- "yes" to proceed\n\t- "no" to cancel the creation of the release\nyes/no?',
+						pattern: /^(yes|no|skip)$/,
+						description: 'Please resolve the merge conflict. When you are done please type\n\t- "yes" to proceed\n\t- "no" to abort the creation of the release\n\t- "skip" to skip this branch from the release\nyes/no/skip?',
 						required: true
 					},
 				})
 				.then(function (response) {
 					if (response.valid === 'no') {
 						throw new Error('Stop process => rollback');
+					}
+					if (response.valid === 'skip') {
+						return gitExec({
+							args: ['merge', '--abort'],
+						});
 					}
 				});
 			})
