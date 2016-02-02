@@ -447,7 +447,7 @@ function listPullRequestsToMerge() {
 }
 
 function parseTicketFromPullRequest(pullRequestName) {
-	var matches = pullRequestName.match(/([A-Z]{3,4}-[0-9]+)/i);
+	var matches = pullRequestName.match(/([A-Z]{2,4}-[0-9]+)/i);
 	if (matches){
 		return matches[1].toUpperCase();
 	} else {
