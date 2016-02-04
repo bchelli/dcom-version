@@ -30,6 +30,7 @@ var program = commander
 	.option('-r, --repository <repository>', 'Path to the repository', absolutePath, process.cwd())
 	.option('-s, --skip-merge-conflict', 'Skip merge conflicts and notify the user that the branch was skipped')
 	.option('-c, --clear', 'Clear the release branch and start from scratch')
+	.option('-s, --silent', 'Don\'t output the info logs')
 	.parse(process.argv);
 
 
@@ -564,12 +565,12 @@ function gitExec (options) {
 				if (!options.canFail) {
 					var cmd = [].concat([options.cmd], options.args).join(' ');
 					if (error) {
-						if (!options.noLog) {
+						if (!options.noLog && !program.silent) {
 							console.log('ERROR', cmd);
 						}
 						return reject(error);
 					}
-					if (!options.noLog) {
+					if (!options.noLog && !program.silent) {
 						console.log('SUCCESS', cmd);
 					}
 				}
