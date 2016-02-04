@@ -29,6 +29,7 @@ var program = commander
 	.option('-b, --build <version>', 'Version of the release')
 	.option('-r, --repository <repository>', 'Path to the repository', absolutePath, process.cwd())
 	.option('-s, --skip-merge-conflict', 'Skip merge conflicts and notify the user that the branch was skipped')
+	.option('-c, --clear', 'Clear the release branch and start from scratch')
 	.parse(process.argv);
 
 
@@ -237,7 +238,7 @@ function gotToReleaseBranch () {
 		});
 	});
 
-	if (program.skipMergeConflict) {
+	if (program.clear) {
 		return branchCheckout
 		.then(function () {
 			return gitExec({
@@ -253,7 +254,7 @@ function mergeBranches (options) {
 
 	var prepBranches = ['master'];
 
-	if (!program.skipMergeConflict) {
+	if (!program.clear) {
 		prepBranches.unshift(config.releaseBranch);
 	}
 
