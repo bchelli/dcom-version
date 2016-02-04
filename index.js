@@ -3,19 +3,33 @@
 /*
  * Dependencies
  */
+var commander = require('commander');
 var prompt = require('prompt');
 var execFile = require('child_process').execFile;
 var GitHubApi = require('github');
+var Promise = require('promise');
+var path = require('path');
+var pack = require('./package.json');
 
 
 
 /*
  * Config
  */
-var config = {
-	path: process.cwd()
-};
+var config = {};
 
+
+
+
+var program = commander
+	.version(pack.version)
+	.option('-u, --username <username>', 'Github username')
+	.option('-p, --password <password>', 'Github password')
+	.option('-l, --label <label>', 'Github Pull-request label to filter')
+	.option('-b, --build <version>', 'Version of the release')
+	.option('-r, --repository <repository>', 'Path to the repository', absolutePath, process.cwd())
+	.option('-s, --skip-merge-conflict', 'Skip merge conflicts and notify the user that the branch was skipped')
+	.parse(process.argv);
 
 
 Promise.resolve(config)
@@ -44,7 +58,7 @@ Promise.resolve(config)
 				required: true,
 				hidden: true
 			},
-			version: {
+			build: {
 				pattern: /^[0-9]*\.[0-9]*\.[0-9]*$/,
 				description: 'Version number:',
 				required: true
@@ -52,10 +66,10 @@ Promise.resolve(config)
 			label: {
 				description: 'Label (default: readyForMerge):',
 			},
-		})
+		}, program)
 		.then(function (inputs) {
 			config.label = inputs.label;
-			config.version = inputs.version;
+			config.version = inputs.build;
 			config.githubCredentials = {
 				username: inputs.username,
 				password: inputs.password,
@@ -124,6 +138,7 @@ Promise.resolve(config)
 	 * Clean up
 	 */
 	.catch(function (error) {
+		config.errorCaught = true;
 		console.error(error);
 		return cleanUpModifications()
 			.then(goBackToPreviousBranch)
@@ -131,6 +146,17 @@ Promise.resolve(config)
 			.then(cleanUpTag)
 			;
 	})
+
+	/*
+	 * Handle exit status
+	 */
+	.then(function () {
+		if (config.errorCaught || config.failedBranches.length) {
+			process.exit(1);
+		}
+		process.exit();
+	})
+
 	;
 
 
@@ -201,7 +227,8 @@ function fetch () {
 
 function gotToReleaseBranch () {
 	config.releaseBranch = 'release_'+config.version.split('.').slice(0, 2).join('.');
-	return gitExec({
+
+	var branchCheckout = gitExec({
 		args: ['checkout', '-b', config.releaseBranch, 'origin/master'],
 	})
 	.catch(function () {
@@ -209,15 +236,32 @@ function gotToReleaseBranch () {
 			args: ['checkout', config.releaseBranch],
 		});
 	});
+
+	if (program.skipMergeConflict) {
+		return branchCheckout
+		.then(function () {
+			return gitExec({
+				args: ['reset', '--hard', 'origin/master'],
+			});
+		});
+	}
+
+	return branchCheckout;
 }
 
 function mergeBranches (options) {
-	position = options.position || 0;
-	branches = options.branches || [].concat(
-		[
-			config.releaseBranch,
-			'master'
-		],
+
+	var prepBranches = ['master'];
+
+	if (!program.skipMergeConflict) {
+		prepBranches.unshift(config.releaseBranch);
+	}
+
+	config.failedBranches = config.failedBranches || [];
+
+	var position = options.position || 0;
+	var branches = options.branches || [].concat(
+		prepBranches,
 		config.pullRequests.map(function (b) { return b.head.ref; })
 	);
 
@@ -248,6 +292,14 @@ function mergeBranches (options) {
 				args: ['diff'],
 			})
 			.then(function (content) {
+				if (program.skipMergeConflict) {
+					return gitExec({
+						args: ['merge', '--abort'],
+					})
+					.then(function () {
+						config.failedBranches.push(branch);
+					});
+				}
 				console.log(content);
 				return promptUserFor({
 					valid: {
@@ -458,9 +510,17 @@ function createRelease () {
 		 * Get the branch
 		 */
 		var now = new Date();
+
 		config.bodyRelease = 'Content:\n' + config.pullRequests.map(function (pr) {
 			return '- '+pr.head.ref+': '+pr.title;
 		}).join('\n');
+
+		if (config.failedBranches.length) {
+			config.bodyRelease += '\n\n\nMerge Conflicts:\n' + config.failedBranches.map(function (branch) {
+				return '- '+branch;
+			}).join('\n');
+		}
+
 		config.github.releases.createRelease({
 			owner:            config.repository.owner,
 			repo:             config.repository.name,
@@ -496,7 +556,7 @@ function gitExec (options) {
 			options.cmd,
 			options.args,
 			{
-				cwd: options.path || config.path,
+				cwd: options.path || program.repository,
 				encoding: 'utf8'
 			},
 			function (error, stdout, stderr) {
@@ -518,18 +578,36 @@ function gitExec (options) {
 	});
 }
 
-function promptUserFor (properties) {
+function promptUserFor (properties, values) {
+
+	var keys = Object.keys(properties);
+	var keysToPrompt = keys.filter(function (k) { return typeof values[k] === 'undefined'; });
+
+	if (!keysToPrompt.length) {
+		return Promise.resolve(keys.reduce(function (props, key) {
+			props[key] = values[key];
+			return props;
+		}, {}));
+	}
+
+	var props = keysToPrompt.reduce(function (props, key) {
+		props[key] = properties[key];
+		return props;
+	}, {});
 
 	return new Promise(function (resolve, reject) {
 
 		prompt.message = '';
 		prompt.delimiter = '';
 		prompt.start();
-		prompt.get({ properties: properties }, function (err, result) {
+		prompt.get({ properties: props }, function (err, result) {
 			if (err) {
 				return reject(err);
 			}
-			resolve(result);
+			resolve(keys.reduce(function (props, key) {
+				props[key] = typeof result[key] === 'undefined' ? values[key] : result[key];
+				return props;
+			}, {}));
 		});
 
 	});
@@ -553,4 +631,8 @@ function displayRecap () {
 	console.log('');
 	console.log('');
 	return true;
+}
+
+function absolutePath (p) {
+	return path.resolve(p);
 }
