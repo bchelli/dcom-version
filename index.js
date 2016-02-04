@@ -30,7 +30,7 @@ var program = commander
 	.option('-r, --repository <repository>', 'Path to the repository', absolutePath, process.cwd())
 	.option('-s, --skip-merge-conflict', 'Skip merge conflicts and notify the user that the branch was skipped')
 	.option('-c, --clear', 'Clear the release branch and start from scratch')
-	.option('-s, --silent', 'Don\'t output the info logs')
+	.option('-m, --mute', 'Don\'t output the info logs')
 	.parse(process.argv);
 
 
