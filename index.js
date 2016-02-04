@@ -565,12 +565,12 @@ function gitExec (options) {
 				if (!options.canFail) {
 					var cmd = [].concat([options.cmd], options.args).join(' ');
 					if (error) {
-						if (!options.noLog && !program.silent) {
+						if (!options.noLog && !program.mute) {
 							console.log('ERROR', cmd);
 						}
 						return reject(error);
 					}
-					if (!options.noLog && !program.silent) {
+					if (!options.noLog && !program.mute) {
 						console.log('SUCCESS', cmd);
 					}
 				}
