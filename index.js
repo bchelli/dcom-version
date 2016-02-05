@@ -426,6 +426,12 @@ function getPullRequestToMerge () {
 				reject(value);
 			}
 		}
+		function resolveAll (pendingIssues, pullRequests) {
+			if (pendingIssues === 0) {
+				config.pullRequests = pullRequests;
+				resolve(pullRequests);
+			}
+		}
 
 		/*
 		 * Connect to Github
@@ -448,6 +454,7 @@ function getPullRequestToMerge () {
 			}
 			var pendingIssues = res.length;
 			var pullRequests = [];
+			resolveAll (pendingIssues, pullRequests);
 			res.forEach(function (issue) {
 				config.github.pullRequests.get({
 					user: config.repository.owner,
@@ -459,10 +466,7 @@ function getPullRequestToMerge () {
 					}
 					pullRequests.push(res);
 					pendingIssues--;
-					if (pendingIssues === 0) {
-						config.pullRequests = pullRequests;
-						resolve(pullRequests);
-					}
+					resolveAll (pendingIssues, pullRequests);
 				});
 			});
 		});
