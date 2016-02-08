@@ -27,11 +27,15 @@ var program = commander
 	.option('-p, --password <password>', 'Github password')
 	.option('-l, --label <label>', 'Github Pull-request label to filter')
 	.option('-b, --build <version>', 'Version of the release')
+	.option('-a, --auto-version <version>', 'Specify the minor version and the build will auto-increment the patch version based on the latest version generated')
 	.option('-r, --repository <repository>', 'Path to the repository', absolutePath, process.cwd())
 	.option('-s, --skip-merge-conflict', 'Skip merge conflicts and notify the user that the branch was skipped')
 	.option('-c, --clear', 'Clear the release branch and start from scratch')
 	.option('-m, --mute', 'Don\'t output the info logs')
 	.parse(process.argv);
+
+
+program.build = program.autoVersion;
 
 
 Promise.resolve(config)
@@ -96,6 +100,11 @@ Promise.resolve(config)
 	.then(fetch)
 
 	/*
+	 * Generate version
+	 */
+	.then(generateVersion)
+
+	/*
 	 * Create release branch
 	 */
 	.then(gotToReleaseBranch)
@@ -142,6 +151,7 @@ Promise.resolve(config)
 	.catch(function (error) {
 		config.errorCaught = true;
 		console.error(error);
+		console.error(error.stack);
 		return cleanUpModifications()
 			.then(goBackToPreviousBranch)
 			.then(cleanUpBranch)
@@ -190,11 +200,17 @@ function getRepoNameAndOwner () {
 		return content.split('\n')[0];
 	})
 	.then(function (remote) {
-		var matches = remote.match(/([^\/\:]*)\/([^\/\:]*)\.git/);
+		var matches = remote.match(/\/([^\/\:]*)\/([^\/\:\s]*)\s/);
+		var owner = matches[1];
+		var name = matches[2];
+
+		if (name.substr(-4) === '.git') {
+			name = name.substr(0, name.length - 4);
+		}
 
 		config.repository = {
-			owner: matches[1],
-			name: matches[2],
+			owner: owner,
+			name: name,
 		};
 	})
 	;
@@ -379,6 +395,31 @@ function pushTag () {
 function pushBranch () {
 	return gitExec({
 		args: ['push', 'origin', config.releaseBranch],
+	})
+	;
+}
+
+function generateVersion () {
+	if (!program.autoVersion) {
+		return Promise.resolve();
+	}
+	return gitExec({
+		args: ['tag', '--list'],
+	})
+	.then(function (content) {
+		return content.split('\n');
+	})
+	.then(function (versions) {
+		return versions.filter(v => v.indexOf(program.autoVersion+'.') === 0);
+	})
+	.then(function (patchVersions) {
+		return patchVersions.map(v => {
+			return parseInt(v.substr(program.autoVersion.length+1));
+		});
+	})
+	.then(function (patches) {
+		patches = patches.sort((b, a) => a>b ? 1 : a<b ? -1 : 0);
+		config.version = program.build = program.autoVersion+'.'+(patches.length ? patches[0] + 1 : 0);
 	})
 	;
 }
