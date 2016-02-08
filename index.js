@@ -201,6 +201,9 @@ function getRepoNameAndOwner () {
 	})
 	.then(function (remote) {
 		var matches = remote.match(/\/([^\/\:]*)\/([^\/\:\s]*)\s/);
+		if (!matches) {
+			matches = remote.match(/([^\/\:]*)\/([^\/\:\s]*)\.git/);
+		}
 		var owner = matches[1];
 		var name = matches[2];
 
