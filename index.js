@@ -410,15 +410,15 @@ function generateVersion () {
 		return content.split('\n');
 	})
 	.then(function (versions) {
-		return versions.filter(v => v.indexOf(program.autoVersion+'.') === 0);
+		return versions.filter(function (v) { return v.indexOf(program.autoVersion+'.') === 0; });
 	})
 	.then(function (patchVersions) {
-		return patchVersions.map(v => {
+		return patchVersions.map(function (v) {
 			return parseInt(v.substr(program.autoVersion.length+1));
 		});
 	})
 	.then(function (patches) {
-		patches = patches.sort((b, a) => a>b ? 1 : a<b ? -1 : 0);
+		patches = patches.sort(function (b, a) { return a>b ? 1 : a<b ? -1 : 0 });
 		config.version = program.build = program.autoVersion+'.'+(patches.length ? patches[0] + 1 : 0);
 	})
 	;
