@@ -93,6 +93,11 @@ Promise.resolve(config)
 	 * Get pull requests to merge
 	 */
 	.then(getPullRequestToMerge)
+	
+	/*
+	 * list them
+	 */
+	.then(listPullRequestsToMerge)
 
 	/*
 	 * Fetch
@@ -517,6 +522,39 @@ function getPullRequestToMerge () {
 
 	});
 
+}
+
+function listPullRequestsToMerge() {
+	config.pullRequests.forEach(function(pullRequest, index){
+		var ticket = parseTicketFromPullRequest(pullRequest.head.ref);
+		var notice;
+		if (ticket){
+			console.log(ticket);
+		}else{
+			console.log("[WARNING] No ticket found for " + pullRequest.head.ref + " authored by " + pullRequest.user.login);
+		}
+	});
+
+	return promptUserFor({
+		goOn: {
+			pattern: /^(yes|no)$/,
+			description: 'Is this okay?  When you have reviewed this list, please type:\n\t- "yes" to proceed\n\t- "no" to abort the creation of the release\nyes/no?',
+			required: true
+		},
+	}).then(function (inputs) {
+		if ('yes'!=inputs.goOn){
+			throw new Error('Stop process => rollback');
+		}
+	});
+}
+
+function parseTicketFromPullRequest(pullRequestName) {
+	var matches = pullRequestName.match(/([A-Z]{2,4}-[0-9]+)/i);
+	if (matches){
+		return matches[1].toUpperCase();
+	} else {
+		return false;
+	}
 }
 
 function branchExists (branch) {
